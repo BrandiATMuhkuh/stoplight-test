@@ -1,0 +1,631 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "2.0",
+    "title": "Amy - API",
+    "description": "\nThis documentation shows you all types of API we offer.\n\n## How to deal with LTI v1.0\n\nCurrently we are using LTI v1.0 to sign LTI requests. This is done so we can proove the integrity of the data. Furthermore, it allows you \nto give a link to a students' browers, and the brower can call us. Without any server to server communication in between. You can use this form of\ncommunication also for server to server communication if you want. \n\n\n### LTI requests\nAll LTI APIs we offer need to be signed correctly. The following is a list of data that should be included in each request. The signature methode is OAuth1. Furthermore, all LTI requests need to be sent as POST requests with form data. \n\n\nPlease never include your shared secret. It is used to form the **oauth_signature**. \n\n\n- oauth_consumer_key: This is your oauth username. \n- oauth_signature_method: must be `HMAC-SHA1`\n- oauth_timestamp\n- oauth_nonce\n- oauth_signature: The signature you generated for the request\n- oauth_version : `1.0`,\n- user_id: a students user_id\n- lis_person_name_given: A students given name\n- lis_person_name_family: A students family name\n- lti_message_type: basic-lti-launch-request\n- lti_version: `LTI-1p0`\n\n\n#### Custom Parameters\nWe (amy) have a couple of custom parameters which define how Amy should behave. \nSuch custom parameters always start with **custom_** .\nThe follow list shows custom parameters which are global. E.g.: show progress on amy or not. Each API might have it's own extra custom parameters too. \nIf you want to try the global custom parameters and see how it changes amy, you can simply append them as camel case to the url. For example, `custom_amy_behavior_hide_frame` can be set via <https://learn.amy.app?hideFrame=true>\n\n- custom_amy_behavior_hide_frame: `true`  Hides the whole amy frame. So only the main content of each page is shows. \n- custom_amy_behavior_hide_teaching_text: `true` Hides the teaching if it exists\n- custom_amy_behavior_assignment_finished_splash: `true` Asks you at the end of the assignment if you want todo the same one again. Otherwise it will navigate you back to the explorer.\n- custom_amy_behavior_progress: `true` Hide the progress bar\n\n\n### OAuth Signature Libraries\nWe are using this library internally to check if the signature is correct: <https://github.com/bettiolo/oauth-signature-js>\n\n\n### Create your own signature (understanding OAuth signature) (POST)\nTo generate a signature the following has to be done. \n\n- we try to create a base string which we will later hash\n- create empty string\n- append methode (POST/GET) as uppercase and finish with an `&`\n- append the URL wihout query parameters. Make sure it's all lower case. Furthermore url-encode your URL. And finially  finish with an `&`.\n- Now comes the hard parts: the body\n- Take all form parameters  (key/values) , except oauth_signature in case you are validating a requist, and sort them by key\n- Combine all key/values with an `=`. \n- Combine all key/values pairs with a `&` sign\n- at this point we have a **query** string type of thing\n- Last part of the body is to URL-enconde them\n- Now we append the \"body\" string with a `&`\n\n\n### Nodejs code generating a secret\n\n```\nconst crypto = require('crypto');\nfunction oAuth1Signature(methode:\"POST\"|\"GET\", url:string, body:any, consumer_secret:string, token_secret:string|undefined){\nlet baseString = methode.toUpperCase()+ \"&\";\n\n// removing the query string\nconst u = new URL(url);\nconst newURL = u.protocol+\"//\"+u.hostname+u.pathname;\nbaseString += encodeURIComponent(newURL.toLowerCase())+\"&\";\n\n// sort and encode body\nbaseString += encodeURIComponent(Object.entries(body).filter(e => e[0]!==\"oauth_signature\").filter(e => e[0]!==\"oauth_token_secret\").sort((a,b)=>{return ('' + a[0]).localeCompare(b[0]);}).map(e => e.join(\"=\")).join(\"&\"));\n\nreturn crypto.createHmac('sha1', consumer_secret+\"&\"+token_secret).update(baseString).digest('base64')\n}\n\n\n// calling the signature function with a body object\nconst trial = oAuth1Signature(\"POST\", \"http://echo.lab.madgex.com/echo.ashx?juhu=234\", {\noauth_consumer_key : \"key\",\noauth_token : \"accesskey\",\noauth_nonce : 997202106,\noauth_timestamp : 1572513407,\noauth_signature_method : \"HMAC-SHA1\",\noauth_version : '1.0',\nfoo: \"bar\",\noauth_signature: \"don't include me\",\n}, \"secret\", \"accesssecret\");\n\n```\n\n\n        "
+  },
+  "servers": [
+    {
+      "description": "local testing",
+      "url": "/dev1-amy-app/us-central1/api/"
+    },
+    {
+      "description": "Main server",
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "LTI v1.0",
+      "description": "API endpoins which use LTI v1.0 for auth/integrity"
+    }
+  ],
+  "paths": {
+    "/v2.0/keys/list": {
+      "get": {
+        "tags": [
+          "keys"
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "description": "Your api key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all your keys",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": [
+                    {
+                      "reads": 5,
+                      "broker_id": "jurgen-broker",
+                      "type": "BROKER",
+                      "created_at": 1583318231847,
+                      "last_used_at": 1583929777942,
+                      "valid": true,
+                      "expires_at": 0,
+                      "api_key": "a-broker-key",
+                      "key_name": "Broker key for jurgen-broker generated at 2020-03-04T10:37:11.846Z"
+                    },
+                    {
+                      "expires_at": 0,
+                      "api_key": "a-school-key",
+                      "school_id": "jurgen-broker_jurgen-school1",
+                      "key_name": "School key for jurgen-broker_jurgen-school1 generated at 2020-03-04T10:37:33.709Z",
+                      "reads": 24,
+                      "broker_id": "jurgen-broker",
+                      "type": "SCHOOL",
+                      "created_at": 1583318253709,
+                      "last_used_at": 1583923185748,
+                      "valid": true
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2.0/keys/revoke-key": {
+      "post": {
+        "tags": [
+          "keys"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "api_key",
+                  "revoke_key"
+                ],
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "description": "Your api key"
+                  },
+                  "revoke_key": {
+                    "type": "string",
+                    "description": "To revoke api key"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked key",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": {
+                    "api_key": "a-borker-key-which-is-not-invalid",
+                    "key_name": "Broker key for demo-broker generated at 2020-03-11T12:35:09.451Z",
+                    "reads": 4,
+                    "broker_id": "demo-broker",
+                    "type": "BROKER",
+                    "created_at": 1583930109451,
+                    "last_used_at": 1583930164975,
+                    "valid": false,
+                    "expires_at": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2.0/keys/broker/create-key": {
+      "post": {
+        "tags": [
+          "keys"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "api_key",
+                  "broker_id"
+                ],
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "description": "Your api key"
+                  },
+                  "broker_id": {
+                    "type": "string",
+                    "description": "The ID you want to give this broker. It must be alphanumeric and can also contain _ or -"
+                  },
+                  "key_name": {
+                    "type": "string",
+                    "description": "You can assign any name to a key. If you don't we auto generate one for you."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated broker key",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": {
+                    "type": "BROKER",
+                    "valid": true,
+                    "api_key": "a-broker-key",
+                    "broker_id": "demo-broker",
+                    "created_at": 1583930109451,
+                    "expires_at": 0,
+                    "last_used_at": 1583930109451,
+                    "reads": 0,
+                    "key_name": "Broker key for demo-broker generated at 2020-03-11T12:35:09.451Z"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2.0/keys/school/create-key": {
+      "post": {
+        "tags": [
+          "keys"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "api_key",
+                  "school_id"
+                ],
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "description": "Broker api key"
+                  },
+                  "school_id": {
+                    "type": "string",
+                    "description": "The ID you want to give this school. It must be alphanumeric and can also contain _ or -"
+                  },
+                  "key_name": {
+                    "type": "string",
+                    "description": "You can assign any name to a key. If you don't we auto generate one for you."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated school key",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": {
+                    "type": "SCHOOL",
+                    "valid": true,
+                    "api_key": "a-school-key",
+                    "broker_id": "jurgen-broker",
+                    "school_id": "jurgen-broker_demo-school2",
+                    "created_at": 1583930221595,
+                    "expires_at": 0,
+                    "last_used_at": 1583930221595,
+                    "reads": 0,
+                    "key_name": "School key for jurgen-broker_demo-school2 generated at 2020-03-11T12:37:01.595Z"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2.0/auth/create-student-token": {
+      "post": {
+        "description": "\nThis endpoint allows you to generate a firebase user token. This token can be used in conjunction with the firebase sdk to login a user. Please use this API only on your server not in the browser as it would expose your API key. \nThe best way to communicate the token between your user (student) and us, is for you to create your own endpoint your user (student) can talk to. \n\n\nHere is a simple example on how you would authenticate a user to firebase. Replace <USERS_AUTH_TOKEN> with the token you got via the API.\n                \n    <script src=\"https://www.gstatic.com/firebasejs/7.3.0/firebase-app.js\"></script>\n    <script src=\"https://www.gstatic.com/firebasejs/7.3.0/firebase-auth.js\"></script>\n    <script src=\"https://www.gstatic.com/firebasejs/7.3.0/firebase-firestore.js\"></script>\n\n    <script>\n\n    // init firebase\n    firebase.initializeApp( {\n        apiKey: \"AIzaSyDJ20dFy6oeNt3uF_URIBD5lllZs-l0b6o\",\n        projectId: \"amy-ac\"\n    });\n    \n    var app = firebase.app();\n\n\n    // We sign in via a temporary Firebase app to update the profile.\n    app.auth().signInWithCustomToken('<USERS_AUTH_TOKEN>').then(function(user) {\n        console.log(\"singed in\", user);\n\n        document.getElementById(\"message\").innerHTML = \"DONE\";\n        \n    }).catch(function(error) {\n        // Handle Errors here.\n        var errorCode = error.code;\n        var errorMessage = error.message;\n        console.log(\"errorCode\",errorCode);\n        console.log(\"errorMessage\", errorMessage);\n        \n\n        document.getElementById(\"message\").innerHTML = \"ERROR: Open sonsole please\";\n\n    });\n\n    </script>\n\n    <div id=\"message\"></div>\n                \n                \n                                    ",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "api_key",
+                  "student_id"
+                ],
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "description": "A school API key"
+                  },
+                  "student_id": {
+                    "type": "string",
+                    "description": "Your internal student_id of a student."
+                  },
+                  "nickname": {
+                    "type": "string",
+                    "description": "Name for a student which can be used by Amy. If it's not given, Amy will form sentences without a name. Take care, this can only be set once per student. As soon as the student exists, he/she keeps that name."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A firebase auth token and an internal student_id",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": {
+                    "token": "token13323",
+                    "student_id": "jurgen-broker_jurgen-school1_demo-user1"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2.0/auth/create-student": {
+      "post": {
+        "description": "Generate a student and get the student_id in return ",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "api_key",
+                  "student_id"
+                ],
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "description": "School api key"
+                  },
+                  "student_id": {
+                    "type": "string",
+                    "description": "Your internal student_id of a student."
+                  },
+                  "nickname": {
+                    "type": "string",
+                    "description": "Name for a student which can be used by Amy. If it's not given, Amy will form sentences without a name. Take care, this can only be set once per student. As soon as the student exists, he/she keeps that name."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns our internal student_id",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": {
+                    "student_id": "jurgen-broker_jurgen-school1_demo-studen2"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2.0/lti-v1.0/path-starter": {
+      "post": {
+        "tags": [
+          "LTI v1.0"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "custom_amy_explorer_path": {
+                    "type": "string",
+                    "description": "Describes the explorer entry point of amy. Eg. `/root` will start amy at `https://learn.amy.app/explorer/root`"
+                  }
+                },
+                "required": [
+                  "custom_amy_explorer_path"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Forwarding to `https://learn.amy.app/explorer`"
+          }
+        }
+      }
+    },
+    "/v2.0/amy/create-student-assignment": {
+      "post": {
+        "description": "\n## Levels\n\nTo be able to give you the best analytic data possible, we strongly advice you to add as much data into the levels as you can. This will later allow you to group your data by any of those levels. This can be of particular interrest for teachers. \n                \n\n### Unfinished Levels Docs\n\nLevel Description           | Are                                                                               | Example  \n---                         | ---                                                                               | ---\nlevel_subject_subject       | The subject for the assignment.                                                   | Math, Physics, etc. \nlevel_subject_branch        | A branch of the subject.                                                          | **Arithmetic** for Math  \n\n",
+        "tags": [
+          "assignment"
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "api_key",
+                  "student_id",
+                  "arch_id"
+                ],
+                "properties": {
+                  "api_key": {
+                    "type": "string",
+                    "description": "school api key"
+                  },
+                  "student_id": {
+                    "type": "string",
+                    "description": "student_id generate when generating a student token or a student"
+                  },
+                  "arch_id": {
+                    "type": "array",
+                    "description": "A list of archetypes you want the student to study.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "template_id": {
+                    "type": "string",
+                    "description": "A template_id is used to indicate an assignmented that started with the same archetypes. For example, you might want to give all students in a class 3 archetypes ([arch1,arch2,arch3]). Later you want to find all students who did an assignment with those 3 archetypes. To do that, you need to assign a template_id. "
+                  },
+                  "teaching_type": {
+                    "default": "AMY",
+                    "type": "string",
+                    "enum": [
+                      "AMY",
+                      "AMY_KEEPING_ORIGINS",
+                      "CLASSIC"
+                    ],
+                    "description": "\nDefault = AMY. A teaching type defines how Amy teaches in case students make mistakes. \n* \"AMY\" - Amy will add new exercises when a student makes mistakes. That can cause archetrypes with where originally added to be done for this assignmed to be pushed auto of the max_questions length.\n* \"AMY_KEEPING_ORIGINS\" - Amy will add new exercises when a student makes mistakes. However, the originally defined archetypesIDs for this assignment can never we pushed out. That means at some point Amy might stop auto teaching to make sure all specified archetype are taught. \n* \"CLASSIC\" - Amy will not react to any mistakes. It's called classic because it's like giving a student a piece of paper. Noone will automatcially add new exercises in case the student does anything wrong. \n                                        "
+                  },
+                  "teaching_setup_type": {
+                    "default": "AMY",
+                    "type": "string",
+                    "enum": [
+                      "AMY",
+                      "ARRAY"
+                    ],
+                    "description": "\nDefault = AMY. A teaching setup type defines how many exercises are per default in an assignment.  \n* \"AMY\" - Amy will look at each archetypeId and the students progress and automatically add a couple more of the same exercise if Amy thinks the student will needed that to get full knowledge on it.\n* \"ARRAY\" - Amy will start an assignment with exactly the given archetypeIds. She won't make any adjustments beforehand.\n                                        "
+                  },
+                  "max_questions": {
+                    "type": "number",
+                    "description": "Default = 30. max_questions is the maximum lenght an assignment can get. Since Amy keeps adding new exercises if a student strugges, this could potentially become infinite."
+                  },
+                  "level_subject_subject": {
+                    "type": "string",
+                    "description": "The subject for the assignment. For example: Math, Physics, etc."
+                  },
+                  "level_subject_branch": {
+                    "type": "string",
+                    "description": "A branch of the subject. For example **Arithmetic** for Math"
+                  },
+                  "level_subject_area": {
+                    "type": "string",
+                    "description": "For example: **Fundamental Operators** for Arithmetic"
+                  },
+                  "level_subject_topic": {
+                    "type": "string",
+                    "description": "For example: Addition"
+                  },
+                  "level_subject_subtopic": {
+                    "type": "string",
+                    "description": "For example: Simple Addition"
+                  },
+                  "level_subject_subsubtopic": {
+                    "type": "string",
+                    "description": "No good example so far :/"
+                  },
+                  "level_curriculum_country": {
+                    "type": "string",
+                    "description": "The country this assignment belongs too. This should be of type [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). In case it's not clear, use `WO` for the World."
+                  },
+                  "level_curriculum_curriculum": {
+                    "type": "string",
+                    "description": "The name of the curriculum. For example: NCEA, IB, GCSE, etc."
+                  },
+                  "level_curriculum_level": {
+                    "type": "string",
+                    "description": "The level (often called year). For example: Y9 or O-levels"
+                  },
+                  "level_curriculum_course": {
+                    "type": "string",
+                    "description": "The name of the course at best in the context of the country or curriculum. For example: Stats in NZ"
+                  },
+                  "level_curriculum_module": {
+                    "type": "string",
+                    "description": "The name of the module. Eg. 91028 for Number in the NZEA curriculum"
+                  },
+                  "level_curriculum_topic": {
+                    "type": "string",
+                    "description": "A topic in the curriculum. For example: Fractions"
+                  },
+                  "level_curriculum_subtopic": {
+                    "type": "string",
+                    "description": "A sub topic in the curriculum. This should be related to the topic. For example: adding fraction"
+                  },
+                  "level_curriculum_subsubtopic": {
+                    "type": "string",
+                    "description": "An even more detailed definition of a topic: For example: adding fraction with a common denominator"
+                  },
+                  "level_curriculum_assignment": {
+                    "type": "string",
+                    "description": "NOT CLEAR"
+                  },
+                  "level_curriculum_exercise": {
+                    "type": "string",
+                    "description": "NOT CLEAR"
+                  },
+                  "level_admin_amy": {
+                    "type": "string",
+                    "description": "NOT CLEAR"
+                  },
+                  "level_admin_country": {
+                    "type": "string",
+                    "description": "The country this the schools belongs too. This should be of type [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). In case it's not clear, use `WO` for the World."
+                  },
+                  "level_admin_broker": {
+                    "type": "string",
+                    "description": "IS AUTO DEFINED via the used api_key"
+                  },
+                  "level_admin_district": {
+                    "type": "string",
+                    "description": "The school district. For example: Canterbury"
+                  },
+                  "level_admin_curriculum": {
+                    "type": "string",
+                    "description": "The name of the curriculum. For example: NCEA, IB, GCSE, etc."
+                  },
+                  "level_admin_institution_group": {
+                    "type": "string",
+                    "description": "The institution group of the school. For example: GEMS, VOSÖ, etc."
+                  },
+                  "level_admin_institution": {
+                    "type": "string",
+                    "description": "IS AUTO DEFINED via the used api_key"
+                  },
+                  "level_admin_stream": {
+                    "type": "string",
+                    "description": "The stream of the school or student. For example: Arts, Science, IT, etc. "
+                  },
+                  "level_admin_year": {
+                    "type": "string",
+                    "description": "The year level of the student/class. For example: Y9"
+                  },
+                  "level_admin_class": {
+                    "type": "string",
+                    "description": "The name of the class. For example: Class 1, Y2020-Level5-Class1, etc."
+                  },
+                  "level_admin_group": {
+                    "type": "string",
+                    "description": "A group within a class. For example: A,B,C or Group1,Group2,Group3"
+                  },
+                  "level_admin_student": {
+                    "type": "string",
+                    "description": "The student name or id"
+                  },
+                  "level_admin_parent": {
+                    "type": "string",
+                    "description": "The student's parent name or id"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ID of the assignment",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "SUCCESS",
+                  "message": null,
+                  "data": {
+                    "student_assignment_id": "UWZ2GeymvxdWzezCOS7A"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/experimental/analytics/active-students": {
+      "get": {
+        "tags": [
+          "experimental"
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "description": "Your api key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start_date",
+            "description": "Start date as UTC timestamp in milliseconds. Eg. in js: `Date.now()` ",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "end_date",
+            "description": "End date as UTC timestamp in milliseconds. Eg. in js: `Date.now()` ",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all your keys",
+            "content": {
+              "application/json": {
+                "example": {
+                  "foo": "bar"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
